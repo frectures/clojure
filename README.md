@@ -111,16 +111,82 @@ sugar = do
 ## Closures
 
 > A technique for implementing lexically scoped name binding in a language with first-class functions.
-> 
-> Unlike a plain function, a closure allows the function to access those *captured variables* [...],
-> even when the function is invoked outside their scope.
+>
+> Operationally, a closure is a record storing a function together with an environment.
 
 https://en.wikipedia.org/wiki/Closure_(computer_programming)
 
-- Are variables captured by value or by reference?
-- Are mutations of captured variables allowed?
-
 ### JavaScript (1995)
+
+```js
+function outer(x) {
+    function inner() {
+        return x;
+    }
+    return inner;
+}
+
+let a = outer(42);
+a() // 42
+```
+
+- The `inner` function captures the parameter `x` of the `outer` function
+- `x` remains available to `inner` after `outer` returns
+- `x` is captured by reference, i.e. `x` is the same variable everywhere
+- JavaScript allows mutation of `x` everywhere:
+
+```js
+function countFrom(x) {
+    function inner() {
+        return x++;
+    }
+    if (!(x >= 0)) {
+        x = 0;
+    }
+    return inner;
+}
+
+let g = countFrom(10);
+g() // 10
+g() // 11
+g() // 12
+
+g = countFrom("hi");
+g() // 0
+g() // 1
+g() // 2
+```
+
+### C++ (2011)
+
+```c++
+auto outer(int x) {
+    return [x]() {
+        return x;
+    };
+}
+```
+
+- Captured variables must be explicitly mentioned in the capture list `[x]`
+- By default, variables are captured *by value* (copied)
+  1. outer `x` is copied into inner `x` when lambda is evaluated
+  2. outer `x` is popped off the stack when `outer` returns
+- Mutation of captured copies must be enabled via `mutable`:
+
+```c++
+auto countFrom(int x) {
+    if (!(x >= 0)) {
+        x = 0;
+    }
+    auto inner = [x]() mutable -> int {
+        return x++;
+    }
+    x = 42;
+    return inner;
+}
+```
+
+### OOP 🤔 Isn't a closure just a single-method object?
 
 ```js
 function add(a) {
@@ -129,53 +195,14 @@ function add(a) {
     };
 }
 
-const increment = add(1);
-const three = increment(2);
-
-
-function randomNumberGenerator(seed) {
-    const rng = function () {
-        seed = (seed * 1664525 + 1013904223) & 0xffffffff;
-        return seed;
-    };
-    ++seed;
-    return rng;
-}
-
-const rng = randomNumberGenerator(0);
-const randomNumber = rng(); // 1015568748
+let increment = add(1);
+let three = increment(2);
 ```
-
-### C++ (2011)
-
-```c++
-auto add(double a) {
-    return [a](double b) {
-        return a + b;
-    };
-}
-
-const auto increment = add(1);
-const auto three = increment(2);
-
-
-auto randomNumberGenerator(unsigned seed) {
-    const auto rng = [seed]() mutable -> unsigned {
-        seed = (seed * 1664525 + 1013904223);
-        return seed;
-    };
-    ++seed;
-    return rng;
-}
-
-      auto rng = randomNumberGenerator(0);
-const auto randomNumber = rng(); // 1013904223
-```
-
-### OOP 🤔 Isn't a closure just an object with a single method?
 
 ```java
-public class Add implements java.util.function.IntUnaryOperator {
+import java.util.function.IntUnaryOperator;
+
+public class Add implements IntUnaryOperator {
     private final int a;
 
     public Add(int a) {
@@ -192,7 +219,29 @@ IntUnaryOperator increment = new Add(1);
 int three = increment.applyAsInt(2);
 ```
 
-### FP 🤔 Isn't an object just a dictionary of closures over shared state?
+### FP 🤔 Isn't an object just a dictionary of closures?
+
+```java
+public class Account {
+    private int balance;
+
+    public Account(int balance) {
+        this.balance = balance;
+    }
+
+    public void deposit(int amount) {
+        this.balance += amount;
+    }
+
+    public void withdraw(int amount) {
+        this.balance -= amount;
+    }
+
+    public int getBalance() {
+        return this.balance;
+    }
+}
+```
 
 ```js
 function createAccount(balance) {
